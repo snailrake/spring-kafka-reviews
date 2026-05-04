@@ -1,10 +1,10 @@
 ## Сервис для отзывов о ресторанах
 
-Что запускается в Docker:
+В docker запускается:
 
 - `api-service` - HTTP API
-- `data-service` - читает Kafka и работает с базой
-- `postgres` - база данных
+- `data-service` - читает kafka и работает с базой
+- `postgres` - postgresql база данных
 - `kafka` и `zookeeper` - брокер сообщений
 - `kafka-init` - разово создает топик (чтобы сервисы стартовали стабильно)
 
@@ -13,18 +13,15 @@
 - `docker-compose.yml` - запуск всех контейнеров
 - `.env` - переменные окружения (в репе есть `.env.example`)
 - `db/init.sql` - таблицы и стартовые данные
-- `api-service/` - API и отправка сообщений в Kafka
-- `data-service/` - consumer, запись в Postgres, поиск и отчеты
+- `api-service/` - API и отправка сообщений в kafka
+- `data-service/` - consumer, запись в postgresql, поиск и отчеты
 
 ## Запуск
-
-Из папки `3`.
 
 Если нет `.env`, можно взять пример:
 
 ```powershell
 Copy-Item .env.example .env
-# в .env заменить POSTGRES_PASSWORD
 ```
 
 Дальше:
@@ -37,7 +34,7 @@ API доступно с хоста:
 
 - `http://localhost:8080`
 
-Наружу проброшен только API (8080). PostgreSQL и Kafka доступны только внутри Docker-сети.
+Наружу проброшен только API (8080). postgresql и kafka доступны только внутри docker-сети.
 
 Остановка:
 
@@ -45,7 +42,7 @@ API доступно с хоста:
 docker compose down
 ```
 
-Полный сброс (включая volume Postgres):
+Полный сброс (включая volume postgresql):
 
 ```powershell
 docker compose down -v
@@ -53,7 +50,7 @@ docker compose down -v
 
 ## Примеры запросов
 
-Добавить отзыв (сообщение уходит в Kafka):
+Добавить отзыв (сообщение уходит в kafka):
 
 ```powershell
 curl -X POST http://localhost:8080/api/reviews ^
