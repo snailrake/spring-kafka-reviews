@@ -1,21 +1,27 @@
 ## Описание
 
-Система состоит из 4 компонентов:
+Учебный проект: сервис для отзывов о ресторанах.
 
-- `api-service` (Spring Boot): HTTP API наружу. Принимает данные и отправляет их в Kafka, а также проксирует поиск/отчеты в `data-service`.
-- `data-service` (Spring Boot): читает сообщения из Kafka, сохраняет данные в PostgreSQL и строит отчеты.
-- `postgres` (Database): хранит рестораны и отзывы.
-- `kafka` + `zookeeper` (Broker): очередь сообщений.
+Снаружи есть API, куда можно отправить отзыв. API кладет сообщение в Kafka.
+Дальше отдельный сервис читает сообщения из Kafka, сохраняет данные в PostgreSQL и отдает поиск и отчеты.
+
+Что запускается в Docker:
+
+- `api-service` - HTTP API
+- `data-service` - читает Kafka и работает с базой
+- `postgres` - база данных
+- `kafka` и `zookeeper` - брокер сообщений
+- `kafka-init` - разово создает топик (чтобы сервисы стартовали стабильно)
 
 Тема: отзывы о ресторанах.
 
-## Структура
+## Что где лежит
 
-- `docker-compose.yml` - запуск всех компонентов
-- `.env` - переменные окружения (в репе лежит `.env.example`)
-- `db/init.sql` - схема БД (2 таблицы + FK) и стартовые данные
-- `api-service/` - producer + proxy (Spring Boot + Gradle)
-- `data-service/` - consumer + запросы к БД + отчеты (Spring Boot + Gradle)
+- `docker-compose.yml` - запуск всех контейнеров
+- `.env` - переменные окружения (в репе есть `.env.example`)
+- `db/init.sql` - таблицы и стартовые данные
+- `api-service/` - API и отправка сообщений в Kafka
+- `data-service/` - consumer, запись в Postgres, поиск и отчеты
 
 ## Запуск
 
@@ -24,10 +30,11 @@
 Если у вас нет `.env`, можно взять пример:
 
 ```powershell
-Copy-Item .env.example .env`r`n# в .env поменяйте POSTGRES_PASSWORD на свой
+Copy-Item .env.example .env
+# в .env поменяйте POSTGRES_PASSWORD на свой
 ```
 
-Дальше запуск:
+Дальше:
 
 ```powershell
 docker compose up -d --build
@@ -37,7 +44,7 @@ API доступно с хоста:
 
 - `http://localhost:8080`
 
-Важно: наружу проброшен только API (8080). PostgreSQL/Kafka/ZooKeeper доступны только внутри Docker-сети.
+Важно: наружу проброшен только API (8080). PostgreSQL и Kafka доступны только внутри Docker-сети.
 
 Остановка:
 
@@ -51,7 +58,7 @@ docker compose down
 docker compose down -v
 ```
 
-## API Service (наружу)
+## Примеры запросов
 
 Добавить отзыв (сообщение уходит в Kafka):
 
@@ -61,31 +68,16 @@ curl -X POST http://localhost:8080/api/reviews ^
   -d "{\"restaurantName\":\"Pasta Corner\",\"city\":\"Saratov\",\"author\":\"Ivan\",\"rating\":5,\"comment\":\"Nice place\",\"visitedOn\":\"2026-05-01\"}"
 ```
 
-Поиск (прокси в data-service):
+Поиск:
 
 ```powershell
-curl "http://localhost:8080/api/reviews/search?city=Saratov&min_rating=4&sort_by=created_at&direction=desc"
+curl "http://localhost:8080/api/reviews/search?city=Saratov&min_rating=4&sort_by=created_at&direction=desc&limit=10"
 ```
 
-Отчеты (прокси в data-service):
+Отчеты:
 
 ```powershell
 curl "http://localhost:8080/api/reports/reviews-per-day?days=14"
-curl "http://localhost:8080/api/reports/top-restaurants-by-avg-rating?limit=10&min_reviews=2"
+curl "http://localhost:8080/api/reports/top-restaurants-by-avg-rating?limit=10&min_reviews=1"
 curl "http://localhost:8080/api/reports/most-reviewed-restaurants?limit=10&days=30"
 ```
-
-## Data Service (внутри сети)
-
-Data Service поднимает Kafka consumer и читает сообщения из топика. Каждое сообщение сохраняется в Postgres:
-
-- `restaurants` (уникальность по `name + city`)
-- `reviews` (FK на `restaurants`)
-
-## Отчеты
-
-Минимум 3 отчета:
-
-- `reviews-per-day` - количество отзывов по дням
-- `top-restaurants-by-avg-rating` - топ ресторанов по средней оценке (с фильтром `min_reviews`)
-- `most-reviewed-restaurants` - топ ресторанов по количеству отзывов (опционально за последние N дней)
