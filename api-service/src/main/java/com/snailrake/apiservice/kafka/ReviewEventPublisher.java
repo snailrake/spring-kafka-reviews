@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
+
 @Component
 public class ReviewEventPublisher {
 
@@ -27,10 +29,20 @@ public class ReviewEventPublisher {
     public void publish(ReviewEvent event) {
         try {
             var payload = objectMapper.writeValueAsString(event);
-            var key = event.eventId().toString();
+            var key = restaurantKey(event);
             kafkaTemplate.send(topic, key, payload);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize review event", exception);
         }
+    }
+
+    private String restaurantKey(ReviewEvent event) {
+        var city = normalizeKeyPart(event.city());
+        var restaurant = normalizeKeyPart(event.restaurantName());
+        return city + "|" + restaurant;
+    }
+
+    private String normalizeKeyPart(String value) {
+        return value.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 }
