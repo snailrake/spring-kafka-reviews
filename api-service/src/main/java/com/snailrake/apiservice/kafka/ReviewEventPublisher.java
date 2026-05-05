@@ -27,7 +27,7 @@ public class ReviewEventPublisher {
     public void publish(ReviewEvent event) {
         try {
             var payload = objectMapper.writeValueAsString(event);
-            var key = event.restaurantName() + "|" + event.city();
+            var key = event.eventId().toString();
             kafkaTemplate.send(topic, key, payload);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize review event", exception);
