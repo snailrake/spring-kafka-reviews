@@ -1,7 +1,5 @@
 package com.snailrake.apiservice.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.snailrake.apiservice.client.DataServiceClient;
 import com.snailrake.apiservice.dto.MostReviewedRestaurantResponse;
 import com.snailrake.apiservice.dto.ReviewEvent;
@@ -10,10 +8,9 @@ import com.snailrake.apiservice.dto.ReviewQueuedResponse;
 import com.snailrake.apiservice.dto.ReviewsPerDayResponse;
 import com.snailrake.apiservice.dto.SearchResponse;
 import com.snailrake.apiservice.dto.TopRestaurantAvgRatingResponse;
+import com.snailrake.apiservice.kafka.ReviewEventPublisher;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,21 +28,15 @@ import java.util.UUID;
 @RequestMapping("/api")
 public class ApiController {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
     private final DataServiceClient dataServiceClient;
-    private final ObjectMapper objectMapper;
-
-    @Value("${kafka.topic}")
-    private String kafkaTopic;
+    private final ReviewEventPublisher reviewEventPublisher;
 
     public ApiController(
-            KafkaTemplate<String, String> kafkaTemplate,
             DataServiceClient dataServiceClient,
-            ObjectMapper objectMapper
+            ReviewEventPublisher reviewEventPublisher
     ) {
-        this.kafkaTemplate = kafkaTemplate;
         this.dataServiceClient = dataServiceClient;
-        this.objectMapper = objectMapper;
+        this.reviewEventPublisher = reviewEventPublisher;
     }
 
     @GetMapping("/health")
@@ -54,20 +45,24 @@ public class ApiController {
     }
 
     @PostMapping("/reviews")
-    public ResponseEntity<ReviewQueuedResponse> addReview(@Valid @RequestBody ReviewIn request) throws JsonProcessingException {
+    public ResponseEntity<ReviewQueuedResponse> addReview(@Valid @RequestBody ReviewIn request) {
+        var restaurantName = request.restaurantName().trim();
+        var city = request.city().trim();
+        var author = request.author().trim();
+        var comment = Objects.nonNull(request.comment()) ? request.comment().trim() : null;
+
         var event = new ReviewEvent(
                 UUID.randomUUID(),
                 Instant.now(),
-                request.restaurantName().trim(),
-                request.city().trim(),
-                request.author().trim(),
+                restaurantName,
+                city,
+                author,
                 request.rating(),
-                Objects.nonNull(request.comment()) ? request.comment().trim() : null,
+                comment,
                 request.visitedOn()
         );
 
-        var payload = objectMapper.writeValueAsString(event);
-        kafkaTemplate.send(kafkaTopic, payload);
+        reviewEventPublisher.publish(event);
 
         return ResponseEntity.accepted().body(new ReviewQueuedResponse("queued", event.eventId().toString()));
     }
